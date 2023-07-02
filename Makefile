@@ -1,4 +1,4 @@
-TARGET := Qselect.cpp
+TARGET := BFPRT_algorithm.cpp
 EXECUTABLE := algo
 
 all: $(EXECUTABLE)

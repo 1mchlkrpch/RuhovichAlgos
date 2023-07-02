@@ -49,22 +49,21 @@ size_t Partition(std::vector<int64_t>& arr, size_t from, size_t to, int64_t pivo
 }
 
 int64_t Qselect(std::vector<int64_t>& arr, size_t from, size_t to, size_t k) {
-	if (arr.size() < k) {
-		return std::numeric_limits<int64_t>::max();
-	}
-
+	assert(from <= to && "wrong boundary indeces!");
+	
 	if (from < to) {
 		size_t pos = Partition(arr, from, to, arr[(from + to) / 2]);
-		if (pos > k) {
+
+		if (pos > k + from) {
 			return Qselect(arr, from, pos, k);
-		} else if (pos == k) {
+		} else if (pos == k + from) {
 			return arr[pos];
 		}
 
 		return Qselect(arr, pos, to, k);
 	}
 
-	return std::numeric_limits<int64_t>::max();
+	return arr[from];
 }
 
 void Qsort(std::vector<int64_t>& arr, size_t from, size_t to) {
@@ -96,10 +95,10 @@ int main() {
 	std::vector<int64_t> arr2(arr);
 
 	PrintArr(arr);
-	std::cout << Qselect(arr, 0, arr.size(), 10) << '\n';
+	std::cout << Qselect(arr, 5, 9, 2) << '\n';
 
-	Qsort(arr2, 0, arr2.size());
-	PrintArr(arr2);
+	// Qsort(arr2, 0, 5);
+	// PrintArr(arr2);
 
 	return 0;
 }
