@@ -7,9 +7,6 @@
 
 static constexpr std::size_t kArrSize = 30;
 
-	// To get ~~random element from arr.
-static constexpr std::size_t kKey = 38379;
-
 int64_t Randv(int64_t low = 0, int64_t high = 100) {
 	std::random_device rd;
 	std::mt19937 gen(rd());

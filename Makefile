@@ -1,4 +1,4 @@
-TARGET := Qsort.cpp
+TARGET := Qselect.cpp
 EXECUTABLE := algo
 
 all: $(EXECUTABLE)
