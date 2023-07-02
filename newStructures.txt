@@ -1,0 +1,12 @@
+Queues
+  Queue on two stacks
+
+Heaps
+  Mergeable heaps
+  binary heap
+  soft heap
+  leftist heap/leftist tree
+  fibonacci heap
+
+sorts
+  merge sort

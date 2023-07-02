@@ -1,4 +1,4 @@
-TARGET := TwoStackQueue.cpp
+TARGET := MergeSort.cpp
 EXECUTABLE := algo
 
 all: $(EXECUTABLE)
