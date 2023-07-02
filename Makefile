@@ -1,4 +1,4 @@
-TARGET := MergeSort_Iterative.cpp
+TARGET := Qsort.cpp
 EXECUTABLE := algo
 
 all: $(EXECUTABLE)
