@@ -1,4 +1,4 @@
-TARGET := binaryHeap.cpp
+TARGET := dHeap.cpp
 EXECUTABLE := algo
 
 all: $(EXECUTABLE)
