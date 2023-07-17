@@ -1,4 +1,4 @@
-TARGET := BFPRT_algorithm.cpp
+TARGET := binaryHeap.cpp
 EXECUTABLE := algo
 
 all: $(EXECUTABLE)
