@@ -5,10 +5,10 @@
 #include <cstddef>
 #include <cassert>
 
-static constexpr size_t kMaxAlignSize = alignof(std::max_align_t);
+#include <fstream>
 
 template<typename T, size_t cap, int (*Cmp)(T&, T&)>
-class A_DHeapBase;
+class DHeap;
 
 /** 
  * @brief Auxilary structure for BinaryHeap
@@ -19,7 +19,7 @@ class A_DHeapBase;
 template<typename Tp>
 class A_ArrayBase {
 	template<typename T, size_t cap, int (*C)(T&, T&)>
-	friend class A_DHeapBase;
+	friend class DHeap;
 
 	// Size of comprised type.
 	static constexpr size_t kTypeSize = sizeof(Tp);
@@ -143,22 +143,22 @@ int SimpleCmp(int& a, int& b) {
  * @retval 0  equal.
  * @retval 1  greater.
  */
-template<
-	typename Tp,
-	size_t dCap,
-	int (*Cmp)(Tp&, Tp&)
-	>
-class A_DHeapBase {
+template<typename Tp, size_t dCap, int (*Cmp)(Tp&, Tp&)>
+class DHeap {
 	static constexpr size_t kInitCap = 1;
 
  public:
-	A_DHeapBase():
+	DHeap():
 			arr_() {}
 
-	~A_DHeapBase() = default;
+	~DHeap() = default;
 
 	// Inserts new element in D-Heap.
 	void Insert(Tp el) {
+		if (Find(el) != -1) {
+			return;
+		}
+
 		if (arr_.sz_ == arr_.cap_) {
 			arr_.A_ReallocBuf(arr_.cap_ << 1);
 		}
@@ -174,7 +174,7 @@ class A_DHeapBase {
 			arr_.Delete(idx_of_el);
 		}
 
-		A_Heapify(idx_of_el);
+		A_SiftDown(idx_of_el);
 	}
 
 	void Print() {
@@ -198,22 +198,37 @@ class A_DHeapBase {
 
 		int64_t result = -1;
 
-		if ((cur_idx << 1) + 1 < arr_.sz_) {
-			result = Find(el, (cur_idx << 1) + 1);
-		}
+		for (size_t cur_child = 1; cur_child <= dCap; ++cur_child) {
+			size_t idx_of_cur_child = (cur_idx * dCap) + cur_child;
 
-		if ((cur_idx << 1) + 2 < arr_.sz_ && result == -1) {
-			result = Find(el, (cur_idx << 1) + 2);
+			if (idx_of_cur_child >= arr_.sz_) {
+				break;
+			}
+			
+			result = Find(el, idx_of_cur_child);
+
+			if (result != -1) {
+				break;
+			}
 		}
 
 		return result;
 	}
 
+	void ExtractFirst() {
+		arr_.arr_[0] = arr_.arr_[arr_.sz_ - 1];
+		--arr_.sz_;
+
+		A_SiftDown(0);
+	}
+
  	/* All A_functions:
  	auxilary functions to decompose system work.*/
  private:
- 	void A_SiftUp() {
- 		int64_t cur_child  =  arr_.sz_  - 1;
+ 	// Sifts up element with index = 'idx'.
+ 	void A_SiftUp(int64_t idx = -1) {
+ 		int64_t cur_child = (idx == -1)? arr_.sz_ - 1 : idx;
+
  		int64_t cur_parent = (cur_child - 1) / dCap;
 
  		while (cur_child > 0 && arr_.arr_[cur_child] > arr_.arr_[cur_parent]) {
@@ -224,24 +239,20 @@ class A_DHeapBase {
  		}
  	}
 
-	void A_Heapify(size_t idx) {
+ 	// Sifts down element with index = 'idx'.
+	void A_SiftDown(size_t idx) {
 		size_t largest_child = 0;
 
-		size_t  left_child = 0;
-		size_t right_child = 0;
-
 		while (true) {
-			left_child  = (idx << 1) + 1;
-			right_child = (idx << 1) + 1;
-
 			largest_child = idx;
 
-			if (left_child < arr_.sz_ && arr_.arr_[largest_child] < arr_.arr_[left_child]) {
-				largest_child = left_child;
-			}
-
-			if (right_child < arr_.sz_ && arr_.arr_[largest_child] < arr_.arr_[right_child]) {
-				largest_child = right_child;
+			for (size_t cur_child = 1; cur_child <= dCap; ++cur_child) {
+				size_t idx_of_cur_child = (idx * dCap) + cur_child;
+			
+				if (idx_of_cur_child < arr_.sz_
+							&& arr_.arr_[largest_child] < arr_.arr_[idx_of_cur_child]) {
+					largest_child = idx_of_cur_child;
+				}
 			}
 
 			if (largest_child == idx) {
@@ -268,25 +279,53 @@ class A_DHeapBase {
  		return Cmp(a, b) == -1;
  	}
 
+ public:
  	// Make .dot graph from heap.
  	void Debug() {
+ 		std::ofstream f("graph.dot");
 
+ 		f << "digraph G {\n";
+
+		for (size_t cur_v = 0; cur_v < arr_.sz_; ++cur_v) {
+			for (size_t cur_child = 1; cur_child <= dCap; ++cur_child) {
+				if (cur_v * dCap + cur_child < arr_.sz_) {
+					f << '\t' << arr_.arr_[cur_v] << " -> " << arr_.arr_[cur_v * dCap + cur_child] << '\n';
+				}
+			}
+		}
+
+		f << "}\n";
+		f.close();
+
+		system("dot -Tpng graph.dot > graph.png");
  	}
 
  private:
  	A_ArrayBase<Tp> arr_{};
 };
 
+static constexpr size_t kCapacity = 17;
+
 int main() {
 	std::ios_base::sync_with_stdio(false);
 	std::cin.tie(nullptr);
 
-	A_DHeapBase<int, 3, &SimpleCmp> d_heap;
+	DHeap<int, 5, &SimpleCmp> d_heap;
 
-	d_heap.Insert(111);
-	d_heap.Insert(222);
-	d_heap.Insert(333);
-	d_heap.Insert(444);
+	for (size_t el = 0; el < kCapacity; ++el) {
+		int added_el = el * 3237 % kCapacity;
+
+		d_heap.Insert(added_el);
+	}
+
+	d_heap.ExtractFirst();
+	d_heap.ExtractFirst();
+
+	d_heap.Print();
+
+	std::cout << "idx:" << d_heap.Find(2) << '\n';
+
+	d_heap.Debug();
 
 	return 0;
 }
