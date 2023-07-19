@@ -83,7 +83,24 @@ uint64_t kEachSymInSubstring(std::string& s, uint64_t at_least_number)
 		uint64_t nSymsOccuringAtLeastKTimes = 0;
 
 		while (righ_cursor < s.size()) {
-			uint64_t idx = Ind(s[left_cursor]);
+			uint64_t idx = 0;
+			if (cur_unique <= K) {
+				idx = Ind(s[righ_cursor]);
+			} else {
+				idx = Ind(s[left_cursor]);
+			}
+
+			uint64_t delta = (cur_unique <= K)? 1 : -1;
+
+			if (cnt[idx] == 0) {
+				cur_unique += delta;
+			}
+			
+			cnt[idx] += delta;
+
+			if (cnt[idx] == at_least_number) {
+				nSymsOccuringAtLeastKTimes += delta;
+			}
 
 			/* If we met k+1-new unuque symbol we will move left border in while
 			until we have k+1 unique symbol in current substring.*/ 
@@ -93,21 +110,10 @@ uint64_t kEachSymInSubstring(std::string& s, uint64_t at_least_number)
 				++left_cursor;
 			}
 
-			uint64_t delta = (cur_unique <= K)? 1 : -1;
-
-			if (cnt[idx] == 0) {
-				cur_unique += delta;
-			}
-
-			if (cnt[idx] == at_least_number) {
-				nSymsOccuringAtLeastKTimes += delta;
-			}
-			
-			cnt[idx] += delta;
-
 			// Update champion.
-			ans = (cur_unique == K && nSymsOccuringAtLeastKTimes == K)?
-					std::max(ans, righ_cursor - left_cursor) : ans;
+			if (cur_unique == K && nSymsOccuringAtLeastKTimes == K) {
+				ans = std::max(ans, righ_cursor - left_cursor);
+			}
 		}
 	}
 
@@ -119,8 +125,11 @@ int main() {
 	std::cin.tie(nullptr);
 
 	uint64_t k = 0;
+	uint64_t n = 0;
 	std::string s;
-	std::cin >> s >> k;
+	std::cin >> n >> k >> s;
+
+	s.resize(n);
 
 	std::cout << kEachSymInSubstring(s, k) << std::endl;
 

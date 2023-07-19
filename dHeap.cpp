@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <cassert>
+#include <vector>
 
 #include <fstream>
 
@@ -13,7 +14,7 @@ class DHeap;
 /** 
  * @brief Auxilary structure for BinaryHeap
  * to manage all the logic connected with arrays.
- * 
+ *  
  * @param Tp  type of comprised data.
  */
 template<typename Tp>
@@ -29,6 +30,22 @@ class A_ArrayBase {
  public:
  	A_ArrayBase() noexcept
  		: sz_(0), cap_(kInitCap), arr_(A_AllocDfltBuf(kInitCap)) {}
+
+ 	A_ArrayBase(std::vector<Tp>& v)
+ 			: sz_(v.size()), cap_(v.size()), arr_(new Tp[v.size()]) {
+ 		
+ 		for (size_t el_idx = 0; el_idx < sz_; ++el_idx) {
+ 			arr_[el_idx] = v[el_idx];
+ 		}
+ 	}
+
+ 	size_t Cap() {
+ 		return cap_;
+ 	}
+
+ 	Tp at(size_t idx) {
+ 		return (idx < cap_)? arr_[idx] : Tp();
+ 	}
 
  	// Prints all the elements in array.
 	void Print() {
@@ -131,8 +148,7 @@ int SimpleCmp(int& a, int& b) {
 }
 
 /**
- * @brief Auxilary class to manage all the work
- * with memory in itself for DHeap.
+ * @brief Max in root D-Heap.
  * 
  * @param Tp   type of contained objects.
  * @param dCap quantity of children in knot.
@@ -150,6 +166,11 @@ class DHeap {
  public:
 	DHeap():
 			arr_() {}
+
+	DHeap(std::vector<Tp> v):
+			arr_(v) {
+		Heapify();
+	}
 
 	~DHeap() = default;
 
@@ -216,11 +237,43 @@ class DHeap {
 	}
 
 	void ExtractFirst() {
-		arr_.arr_[0] = arr_.arr_[arr_.sz_ - 1];
+		std::swap(arr_.arr_[0], arr_.arr_[arr_.sz_ - 1]);
 		--arr_.sz_;
 
 		A_SiftDown(0);
 	}
+
+
+	// O(n) procedure.
+	void Heapify() {
+		for (size_t el_idx = 0; el_idx < arr_.sz_; ++el_idx) {
+			A_SiftUp(el_idx);
+		}
+	}
+
+	// Make .dot graph from heap.
+ 	void Debug() {
+ 		std::ofstream f("graph.dot");
+
+ 		f << "digraph G {\n";
+
+		for (size_t cur_v = 0; cur_v < arr_.sz_; ++cur_v) {
+			for (size_t cur_child = 1; cur_child <= dCap; ++cur_child) {
+				if (cur_v * dCap + cur_child < arr_.sz_) {
+					f << '\t' << arr_.arr_[cur_v] << " -> " << arr_.arr_[cur_v * dCap + cur_child] << '\n';
+				}
+			}
+		}
+
+		f << "}\n";
+		f.close();
+
+		system("dot -Tpng graph.dot > graph.png");
+ 	}
+
+ 	A_ArrayBase<Tp>& GetArr() {
+ 		return arr_;
+ 	}
 
  	/* All A_functions:
  	auxilary functions to decompose system work.*/
@@ -279,53 +332,55 @@ class DHeap {
  		return Cmp(a, b) == -1;
  	}
 
- public:
- 	// Make .dot graph from heap.
- 	void Debug() {
- 		std::ofstream f("graph.dot");
-
- 		f << "digraph G {\n";
-
-		for (size_t cur_v = 0; cur_v < arr_.sz_; ++cur_v) {
-			for (size_t cur_child = 1; cur_child <= dCap; ++cur_child) {
-				if (cur_v * dCap + cur_child < arr_.sz_) {
-					f << '\t' << arr_.arr_[cur_v] << " -> " << arr_.arr_[cur_v * dCap + cur_child] << '\n';
-				}
-			}
-		}
-
-		f << "}\n";
-		f.close();
-
-		system("dot -Tpng graph.dot > graph.png");
- 	}
-
  private:
  	A_ArrayBase<Tp> arr_{};
 };
 
 static constexpr size_t kCapacity = 17;
 
+// int main() {
+// 	std::ios_base::sync_with_stdio(false);
+// 	std::cin.tie(nullptr);
+
+// 	DHeap<int, 3, &SimpleCmp> d_heap;
+
+// 	for (size_t el = 0; el < kCapacity; ++el) {
+// 		int added_el = el * 3237 % kCapacity;
+
+// 		d_heap.Insert(added_el);
+// 	}
+
+// 	d_heap.Heapify();
+
+// 	d_heap.Print();
+
+// 	std::cout << "idx:" << d_heap.Find(2) << '\n';
+
+// 	d_heap.Debug();
+
+// 	return 0;
+// }
+
+
 int main() {
 	std::ios_base::sync_with_stdio(false);
 	std::cin.tie(nullptr);
 
-	DHeap<int, 5, &SimpleCmp> d_heap;
-
-	for (size_t el = 0; el < kCapacity; ++el) {
-		int added_el = el * 3237 % kCapacity;
-
-		d_heap.Insert(added_el);
+	std::vector<int> v;
+	for (size_t i = 1; i < kCapacity; ++i) {
+		v.push_back(i * 3237 % kCapacity);
 	}
 
-	d_heap.ExtractFirst();
-	d_heap.ExtractFirst();
+	DHeap<int, 3, &SimpleCmp> d_heap(v);
 
-	d_heap.Print();
+	for (size_t el = 0; el < kCapacity - 1; ++el) {
+		d_heap.ExtractFirst();
+	}
 
-	std::cout << "idx:" << d_heap.Find(2) << '\n';
-
-	d_heap.Debug();
+	A_ArrayBase<int> arr = d_heap.GetArr();
+	for (size_t el = 0; el < arr.Cap(); ++el) {
+		std::cout << arr.at(el) << '\n';
+	}
 
 	return 0;
 }
