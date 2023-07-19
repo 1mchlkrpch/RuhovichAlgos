@@ -1,8 +1,8 @@
-TARGET := dHeap.cpp
+TARGET := kEachSymInSubstring.cpp
 EXECUTABLE := algo
 
 all: $(EXECUTABLE)
-	@./$(EXECUTABLE)
+	@./$(EXECUTABLE) < input
 
 $(EXECUTABLE): $(TARGET)
 	g++ -g -Wall -Wextra -Wpedantic $< -o $@
