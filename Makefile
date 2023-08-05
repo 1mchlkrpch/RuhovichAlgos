@@ -1,4 +1,4 @@
-TARGET := sparseTable.cpp
+TARGET := HeapMin.cpp
 EXECUTABLE := algo
 
 all: $(EXECUTABLE)
