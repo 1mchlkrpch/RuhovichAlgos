@@ -1,0 +1,300 @@
+#include <iostream>
+#include <cstdio>
+#include <initializer_list>
+
+namespace lib
+{
+template <typename Tp>
+class cycled_dlist
+{
+protected:
+	struct cell
+	{
+		cell *next{nullptr};
+		cell *prev{nullptr};
+
+		Tp val{};
+
+		uint64_t id{0};
+
+		cell(Tp val): val(std::move(val)) {}
+
+		void operator++() { this = this->next; }
+	};
+
+ public:
+	cycled_dlist() = default;
+
+	cycled_dlist(std::initializer_list<Tp> l)
+	{
+		size_t idx = 0;
+		for (Tp el : l) {
+			push_at(idx, el);
+			++idx;
+		}
+	}
+
+	void push_at(size_t idx, Tp val)
+	{
+		// Create new node using
+		// cell's constructor which use
+		// move-constructor for (cell->val) field
+		// node is cycled on itself.
+		cell *c = cell_ctor(val);
+
+		// After that default emplacement
+		// of the created node to particular index in list.
+		// Indexing in array cosequent:
+		// zero-index equal to place before first node in list
+		// next index correspond to place between first and second node in list.
+		emplace_at(idx, c);
+	}
+
+	void pop_at(int idx)
+	{
+		// If root_ cell has value 'nullptr'
+		// so we have empty list
+		if (root_ == nullptr) {
+			return;
+		}
+
+		// just roll the nodes to get needed one
+		// either with index 'idx' or in the tail of the list.
+		cell *c = root_;
+		for (int el_idx = 0; el_idx < idx && el_idx < (int)sz_ - 1; ++el_idx) {
+			c = c->next;
+		}
+
+		erase_cell(c);
+	}
+
+	void draw()
+	{
+		// Open the file and write all the node
+		// in it. After that compile with graphviz engine.
+		FILE *f = fopen("graph.dot", "w");
+
+		// Print all cells of list recursively
+		// in that file.
+		// It is assumed that we will meet root_-cell
+		// if we print it. In other words list should be either
+		// finit either cycled with set root_-cel.
+		fprintf(f, "digraph G {\n");
+		fprintf_nodes(f, root_);
+		fprintf_connections(f, root_);
+		fprintf(f, "}\n");
+
+		fclose(f);
+		// Compile this graph with graphviz engline.
+		system("dot -Tpng graph.dot -o graph.png");
+	}
+
+	size_t size()
+	{ return sz_; }
+
+	void print()
+	{
+		cell *c = root_;
+		size_t el_idx = 0;
+		for (; el_idx < sz_ - 1; ++el_idx) {
+			printf("[%zu:%d] ",
+				el_idx, c->val);
+			c = c->next;
+		}
+		printf("[%zu:%d]\n",
+			el_idx, c->val);
+	}
+
+	// Connections of two lists
+	// in O(1) time complexity.
+	void connect_with(cycled_dlist<Tp>& other)
+	{
+		cell *other_last = other.root_->prev;
+		cell *last       = root_->prev;
+
+		// From previous node to next node
+		// direction connections:
+		last->next = other.root_;
+		other_last->next = root_;
+
+		// Opposite side dirrection connections.
+		root_->prev = other_last;
+		other.root_->prev = last;
+	}
+
+ private:
+	cell *cell_ctor(Tp val)
+	{
+		cell *new_cell = new cell(val);
+		new_cell->id = (uint64_t)new_cell;
+
+		new_cell->next = new_cell;
+		new_cell->prev = new_cell;
+
+		return new_cell;
+	}
+
+	void emplace_at(size_t idx, cell *c)
+	{
+		++sz_;
+		if (idx == 0) {
+			if (root_ == nullptr) {				
+				root_ = c;
+				return;
+
+			} else {
+				// Here is that is assumed that
+				// if (root_) was already inserted
+				// so if that is the only node in list it will be
+				// cycled on itself in each way.
+				// It means that we can address to next, prev fields.
+				emplace_before(root_, c);
+				return;
+			}
+		}
+
+		cell *after = root_;
+		for (size_t el_idx = 0; el_idx < idx - 1 && el_idx < sz_ - 2; ++el_idx) {
+			after = after->next;
+		}
+
+		// Emplaces after particular cell
+		// and moves root_ cell if it's necessary.
+		emplace_after(after, c);
+	}
+
+	void emplace_after(cell *after, cell *c)
+	{
+		cell *cel_n = after->next;
+
+		// From previous node to next node
+		// direction connections:
+		after->next = c;
+		c->next = cel_n;
+
+		// Opposite side dirrection connections.
+		cel_n->prev = c;
+		c->prev = after;
+	}
+
+	void emplace_before(cell *before, cell *c)
+	{
+		if (root_ == before) {
+			root_ = c;
+		}
+
+		cell *prev_c = before->prev;
+
+		// From previous node to next node
+		// direction connections:
+		prev_c->next = c;
+		c->next = before;
+
+		// Opposite side dirrection connections.
+		before->prev = c;
+		c->prev = prev_c;
+	}
+
+	void erase_cell(cell *c)
+	{
+		--sz_;
+		if (c->next == c) {
+			c->~cell();
+			root_ = nullptr;
+		} else {
+			if (c == root_) {
+				root_ = root_->next;
+			}
+
+			c->prev->next = c->next;
+			c->next->prev = c->prev;
+
+			c->~cell();
+		}
+	}
+
+	void fprintf_nodes(FILE *f, cell *c)
+	{
+		if (f == nullptr || c == nullptr) {
+			return;
+		}
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat"
+		
+		fprintf(f, "\tn%lu[shape=\"rectangle\" label=\"%ld\"]\n\n",
+			c->id, c->val);
+
+#pragma GCC diagnostic pop
+
+		if (c->next != root_) {
+			fprintf_nodes(f, c->next);
+		}
+	}
+
+	void fprintf_connections(FILE *f, cell *c)
+	{
+		if (f == nullptr || c == nullptr) {
+			return;
+		}
+
+		fprintf(f, "\tn%lu->n%lu\n\n",
+			c->id, c->next->id);
+
+		fprintf(f, "\tn%lu->n%lu\n\n",
+			c->id, c->prev->id);
+
+		if (c->next != root_) {
+			fprintf_connections(f, c->next);
+		}
+	}
+
+ private:
+	cell *root_{nullptr};
+	size_t sz_{0};
+};
+
+}; // end of lib.
+
+namespace lib
+{
+
+template <typename Tp>
+class fheap
+{
+protected:
+	struct Node
+	{
+		Tp key{};
+		uint64_t id{0};
+
+		cycled_dlist<Node*> children{};
+	};
+public:
+	fheap() = default;
+
+private:
+	cycled_dlist<Node*> trees_{0};
+};
+
+}; // end of lib.
+
+int main()
+{
+	// // Part of testing cycled doubly-linked list:
+	// lib::cycled_dlist<int> dl1;
+	// dl1.push_at(0, 10);
+	// dl1.push_at(1, 20);
+	// dl1.push_at(2, 30);
+	// dl1.push_at(3, 40);
+	// lib::cycled_dlist<int> dl2 = {100, 200, 300};
+	// dl1.connect_with(dl2);
+	// dl1.draw();
+
+	//////////////////////////////
+	// fibonacci heap usage
+
+	lib::fheap<int> fh;
+
+	return 0;
+}
