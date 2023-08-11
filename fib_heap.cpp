@@ -1,12 +1,22 @@
 #include <iostream>
+
 #include <cstdio>
+
+#include <vector>
 #include <initializer_list>
 
 namespace lib
 {
 template <typename Tp>
+class fheap;
+
+
+template <typename Tp>
 class cycled_dlist
 {
+	template <typename T>
+	friend class fheap;
+
 protected:
 	struct cell
 	{
@@ -23,7 +33,7 @@ protected:
 	};
 
  public:
-	cycled_dlist() = default;
+	cycled_dlist(): sz_(0) {};
 
 	cycled_dlist(std::initializer_list<Tp> l)
 	{
@@ -65,7 +75,8 @@ protected:
 			c = c->next;
 		}
 
-		erase_cell(c);
+		cell *to_delete = extract_cell(c);
+		to_delete->~cell();
 	}
 
 	void draw()
@@ -120,6 +131,8 @@ protected:
 		// Opposite side dirrection connections.
 		root_->prev = other_last;
 		other.root_->prev = last;
+
+		sz_+= other.size();
 	}
 
  private:
@@ -134,13 +147,13 @@ protected:
 		return new_cell;
 	}
 
-	void emplace_at(size_t idx, cell *c)
+	cell *emplace_at(size_t idx, cell *c)
 	{
 		++sz_;
 		if (idx == 0) {
 			if (root_ == nullptr) {				
 				root_ = c;
-				return;
+				return root_;
 
 			} else {
 				// Here is that is assumed that
@@ -148,8 +161,7 @@ protected:
 				// so if that is the only node in list it will be
 				// cycled on itself in each way.
 				// It means that we can address to next, prev fields.
-				emplace_before(root_, c);
-				return;
+				return emplace_before(root_, c);;
 			}
 		}
 
@@ -160,10 +172,10 @@ protected:
 
 		// Emplaces after particular cell
 		// and moves root_ cell if it's necessary.
-		emplace_after(after, c);
+		return emplace_after(after, c);
 	}
 
-	void emplace_after(cell *after, cell *c)
+	cell *emplace_after(cell *after, cell *c)
 	{
 		cell *cel_n = after->next;
 
@@ -175,9 +187,11 @@ protected:
 		// Opposite side dirrection connections.
 		cel_n->prev = c;
 		c->prev = after;
+
+		return c;
 	}
 
-	void emplace_before(cell *before, cell *c)
+	cell *emplace_before(cell *before, cell *c)
 	{
 		if (root_ == before) {
 			root_ = c;
@@ -193,14 +207,17 @@ protected:
 		// Opposite side dirrection connections.
 		before->prev = c;
 		c->prev = prev_c;
+
+		return c;
 	}
 
-	void erase_cell(cell *c)
+	cell *extract_cell(cell *c)
 	{
 		--sz_;
 		if (c->next == c) {
-			c->~cell();
-			root_ = nullptr;
+			if (c == root_) {
+				root_ = nullptr;
+			}
 		} else {
 			if (c == root_) {
 				root_ = root_->next;
@@ -208,9 +225,12 @@ protected:
 
 			c->prev->next = c->next;
 			c->next->prev = c->prev;
-
-			c->~cell();
 		}
+
+		c->next = c;
+		c->prev = c;
+
+		return c;
 	}
 
 	void fprintf_nodes(FILE *f, cell *c)
@@ -263,18 +283,256 @@ template <typename Tp>
 class fheap
 {
 protected:
-	struct Node
+	struct node
 	{
 		Tp key{};
-		uint64_t id{0};
+		uint64_t node_id{0};
 
-		cycled_dlist<Node*> children{};
+		bool is_corupted{false};
+
+		cycled_dlist<node*> children{};
+		// node *ptr_to_root{nullptr};
+		// typename cycled_dlist<lib::fheap<Tp>::node*>::cell *parent{nullptr};
 	};
+
 public:
+	// It uses cycled list nodes to correspond to him while
+	// recursion or in rebuilding of the heap.
+	using dlist_cell_t = typename cycled_dlist<lib::fheap<Tp>::node*>::cell;
+	// Use this type as list of children and main list of fibonacci heap.
+	using dlist_t = cycled_dlist<node*>;
+
 	fheap() = default;
 
+	// Insert just push new element
+	// to the last place in cycled list 'trees' so
+	// Asymptotic of this operation is O(1).
+	void insert(Tp el)
+	{ dlist_cell_t *to_push = trees_.emplace_at(trees_.size(), trees_.cell_ctor(node_ctor(el)));
+	  min = (trees_.sz_ == 1)? to_push : (to_push->val->key < min->val->key)? to_push : min;
+	}
+
+	Tp get_min()
+	{ return min->val->key; }
+
+	// Debug function.
+	// Draws simple graph of fibonacci heap.
+	void draw()
+	{
+		FILE *f = fopen("graph.dot", "w");
+
+		fprintf(f, "digraph HeapGraph {\n");
+
+		// Use this spointer to current cell in 'trees_'-list
+		// we will move this cell forward: c = c->next and
+		// draw fibonacci tree with root in that node.
+		dlist_cell_t *c = trees_.root_;
+		
+		// Firstly draw all the nodes in
+		// Particular fibonacci tree and after that
+		// connects this node to other nodes in 'trees_'-lilst.
+		for (size_t el_idx = 0; el_idx < trees_.size(); ++el_idx) {
+			fprintf_nodes(f, c->val);
+			fprintf_connections(f, c->val);
+			c = c->next;
+		}
+		fprintf(f, "}\n");
+
+		fclose(f);
+		system("dot -Tpng graph.dot -o graph.png");
+	}
+
+	Tp extract_min()
+	{
+		Tp ret = get_min();
+		// Erase min-cell.
+		// Before that save old minimal node and
+		// because dlist::erase_cell doesn't have logic
+		// of deleting 'minimal' cell.
+		dlist_cell_t *old_min = min;
+
+		// Also it's maybe needed to add all children of
+		// minimal-nodes to 'trees_' list to continue comprise
+		// these nodes in heap.
+		if (old_min->val->children.size() > 0) {
+			// This is O(1) connection.
+			// So we don't loose to much time on it.
+			if (trees_.size() == 1) {
+				trees_.root_ = get_root_cell(min->val);
+			}
+			trees_.connect_with(old_min->val->children);
+
+			// Well, actually in this moment we move min
+			// cell to each other node, but...
+			// That action is goot if we have the only fibonacci
+			// tree in our list and the only node is cycled by itself
+			// So we need to let minimal 'label' to some cell from children
+			min = get_root_cell(min->val);
+
+		} else {
+			// If we have have zero size of children
+			// we can let 'minimal' label to some cell
+			// from trees_ list.
+			// Because it will be either the only root in one-cell list
+			// or next next cell in bit trees_ list.
+			min = min->next;
+		}
+
+		// But 'erase_cell' function moves root_ cell
+		// If minimal nodes corresponts to root_.
+		trees_.extract_cell(old_min);
+
+		// Collapse all trees with same ranks.
+		// This function allows extract_min logarifmic assymptotic.
+		// Also this function maintains correct min cell.
+		shrink(trees_);
+
+		printf("after remove min sz:(%zu)\n", trees_.size());
+
+		return ret;
+	}
+
 private:
-	cycled_dlist<Node*> trees_{0};
+	// Creates node with unique
+	// index and place to it 'Tp' value.
+	node *node_ctor(Tp el)
+	{
+		node *new_node = new node;
+		new_node->node_id = (uint64_t)new_node;
+
+		new_node->key = el;
+		// if (trees_.root_ != nullptr) {
+		// 	new_node->ptr_to_root = trees_.root_->val;
+		// }
+
+		return new_node;
+	}
+
+	void fprintf_nodes(FILE *f, node *n)
+	{
+		if (n == nullptr) {
+			return;
+		}
+
+		fprintf(f, "n%lu[shape=\"rectangle\" label=\"%d\"]\n\n",
+			n->node_id, n->key);
+
+		if (n->children.size() > 0) {
+			dlist_cell_t *child = get_root_cell(n);
+			for (size_t child_idx = 0; child_idx < n->children.size(); ++child_idx) {
+				fprintf_nodes(f, child->val);
+				child = child->next;
+			}
+		}
+	}
+
+	void fprintf_connections(FILE *f, node *n)
+	{
+		if (n == nullptr) {
+			return;
+		}
+
+		dlist_cell_t *child = get_root_cell(n);
+		for (size_t child_idx = 0; child_idx < n->children.size(); ++child_idx) {
+			fprintf(f, "n%lu -> n%lu\n\n",
+				n->node_id, child->val->node_id);
+
+			child = child->next;
+		}
+
+		child = get_root_cell(n);
+		for (size_t child_idx = 0; child_idx < n->children.size(); ++child_idx) {
+			fprintf_connections(f, child->val);
+
+			child = child->next;
+		}
+	}
+
+	void shrink(dlist_t& list)
+	{
+		if (list.size() == 0) {
+			return;
+		}
+
+		bool is_changed = true;
+		// We will maintain array of pointers to cells
+		// to fibonacci trees with different ranks.
+		// 
+		// Actually the precise size of this vector
+		// is log(trees.size()).
+		std::vector<dlist_cell_t*> ptrs(list.size(), nullptr);
+
+		dlist_cell_t *c = list.root_;
+
+		while (true) {
+			if (ptrs[c->val->children.size()] == nullptr) {
+				// If we meet root of fibonacci tree
+				// with new rank this place in vector will be free.
+				// So we put pointer to this root in vector.
+				ptrs[c->val->children.size()] = c;
+			} else {
+				// The only case we do all the job
+				// is when in particular place in vector
+				// we already have node itself.
+				// Because it means that we pass all cells int
+				// cycled dlist and don't meet another root with the same rank.
+				if (ptrs[c->val->children.size()] == c) {
+					break;
+				}
+
+				// If we meet root with the same rank we
+				// should merge this trees.
+				// But firstly we will Make free space in that cell.
+				dlist_cell_t *previous_that_rank_cell = ptrs[c->val->children.size()];
+				ptrs[c->val->children.size()] = nullptr;
+
+				// That is crucial that new tree
+				// will be assembled at place of first
+				// argument's cell.
+				c = merge_trees(c, previous_that_rank_cell);
+				min = (c->val->key < min->val->key)? c : min;
+
+				ptrs[c->val->children.size()] = c;
+			}
+
+			// Check next cell in cycled list.
+			c = c->next;
+			min = (c->val->key < min->val->key)? c : min;
+		}
+	}
+
+	// dlist_cell_t *get_parent(node *n)
+	// {
+	// 	return (n->ptr_to_root == nullptr)? n->parent_ : n->ptr_to_root->parent_;
+	// }
+
+	dlist_cell_t *merge_trees(dlist_cell_t *f, dlist_cell_t *s)
+	{
+		if (f->val->key > s->val->key) {
+			std::swap(f, s);
+		}
+
+		f->val->children.emplace_at(f->val->children.size(), trees_.extract_cell(s));
+
+		return f;
+	}
+
+	// void set_parent_attributes(dlist_cell_t *parent, dlist_cell_t *c)
+	// {
+	// 	if (parent->val->children.size() == 0) {
+	// 		c->val->ptr_to_root = nullptr;
+	// 		c->val->parent = parent;
+	// 	} else {
+	// 		c->val->ptr_to_root = parent->val->children.root_->val;
+	// 	}
+	// }
+
+	dlist_cell_t *get_root_cell(node *n)
+	{ return n->children.root_; }
+
+private:
+	dlist_t trees_{};
+	dlist_cell_t *min{nullptr}; 
 };
 
 }; // end of lib.
@@ -293,8 +551,26 @@ int main()
 
 	//////////////////////////////
 	// fibonacci heap usage
-
 	lib::fheap<int> fh;
+	fh.insert(1);
+	fh.insert(2);
+
+
+
+	fh.insert(3);
+	fh.insert(4);
+	fh.insert(5);
+	fh.insert(6);
+	fh.insert(7);
+	fh.insert(8);
+	fh.insert(9);
+
+	fh.extract_min();
+	fh.extract_min();
+
+	std::cout << fh.get_min() << '\n';
+
+	fh.draw();
 
 	return 0;
 }
