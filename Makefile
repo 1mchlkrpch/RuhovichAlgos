@@ -1,11 +1,11 @@
-TARGET := HeapMin.cpp
+TARGET := groupAnagrams.cpp
 EXECUTABLE := algo
 
 all: $(EXECUTABLE)
 	@./$(EXECUTABLE) < input
 
 $(EXECUTABLE): $(TARGET)
-	g++ -g -Wall -Wextra -Wpedantic $< -o $@
-
+	g++ -g -Wno-unused-variable -Waggressive-loop-optimizations -Wall -Wextra -Wpedantic $< -o $@
+# 
 clean:
 	@rm $(EXECUTABLE)
