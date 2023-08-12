@@ -1,4 +1,4 @@
-TARGET := groupAnagrams.cpp
+TARGET := hash.cpp
 EXECUTABLE := algo
 
 all: $(EXECUTABLE)
