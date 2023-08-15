@@ -1,4 +1,4 @@
-TARGET := hash.cpp
+TARGET := fizbuzz2.cpp
 EXECUTABLE := algo
 
 all: $(EXECUTABLE)
